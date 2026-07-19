@@ -15,18 +15,9 @@ import java.util.Objects;
 
 /**
  * Application Interactor: Implementation of the {@link ListUsersUseCase} input port.
- * This service orchestrates the high-performance retrieval of user identities,
- * strictly adhering to the CQRS principle for read-only operations. It enforces
- * hierarchical tenant isolation and utilizes reactive pagination to ensure
- * system stability under high-concurrency discovery requests.
  *
- * <p><b>Architectural Principles (Mission-Critical Pattern):</b></p>
- * <ul>
- *     <li><b>Data Isolation:</b> Mandatory tenant-based scoping for every query.</li>
- *     <li><b>Reactive Streaming:</b> Zero-blocking execution with Flux backpressure.</li>
- *     <li><b>Selective Retrieval:</b> Dynamic routing between status-filtered and
- *         unfiltered tenant streams.</li>
- * </ul>
+ * Orchestrates the retrieval of user entities within a specific tenant boundary.
+ * Enforces clean separation between application query models and domain aggregate roots.
  */
 @Slf4j
 @Singleton
@@ -35,51 +26,52 @@ public class ListUsersInteractor implements ListUsersUseCase {
     private final UserRepositoryPort userRepository;
 
     /**
-     * Explicit constructor injection to prevent proxy-related instantiation
-     * failures (AOT Ready).
+     * Explicit constructor injection to ensure DI resilience.
      */
     @Inject
     public ListUsersInteractor(UserRepositoryPort userRepository) {
-        this.userRepository = userRepository;
+        this.userRepository = Objects.requireNonNull(userRepository, "UserRepositoryPort cannot be null");
     }
 
     /**
-     * Executes the paginated discovery orchestration.
+     * Executes the user discovery pipeline.
      *
-     * @param query The validated {@link ListUsersQuery} containing tenant context
-     *              and pagination metadata.
-     * @return A {@link Flux} streaming the found {@link User} aggregates.
-     * @throws NullPointerException if the provided query is null (Fail-Fast).
+     * @param query The query parameters for pagination and filtering.
+     * @return A {@link Flux} emitting the matching {@link User} domain objects.
      */
     @Override
     @Nonnull
     public Flux<User> execute(@Nonnull ListUsersQuery query) {
         Objects.requireNonNull(query, "ListUsersQuery cannot be null");
 
-        // Micronaut Data Pageable instantiation
         Pageable pageable = Pageable.from(query.page(), query.size());
 
         return Flux.defer(() -> {
-                    log.info("[ACTION: LIST_USERS] [TENANT: {}] [STATUS: {}] [PAGE: {}] - " +
+                    log.info("[ACTION: LIST_USERS] [TENANT: {}] [FILTER: {}] [PAGE: {}] - " +
                                     "Initiating secure discovery stream.",
                             query.tenantId(),
                             (query.status() != null ? query.status() : "ALL"),
                             query.page());
 
-                    if (query.status() != null) {
-                        return userRepository.findByTenantIdAndStatus(
-                                query.tenantId(),
-                                query.status(),
-                                pageable
-                        );
-                    }
-
-                    return userRepository.findByTenantId(query.tenantId(), pageable);
+                    return fetchUsers(query, pageable);
                 })
-                .doOnComplete(() -> log.debug("[ACTION: LIST_USERS] [TENANT: {}] - Discovery pipeline completed.",
+                .doOnComplete(() -> log.debug("[ACTION: LIST_USERS] [TENANT: {}] - Discovery pipeline drained successfully.",
                         query.tenantId()))
-                .doOnError(error -> log.error("[ACTION: LIST_USERS] [TENANT: {}] - Discovery failure: {}",
+                .doOnError(error -> log.error("[ACTION: LIST_USERS] [TENANT: {}] - Discovery pipeline failure: {}",
                         query.tenantId(), error.getMessage()));
     }
-}
 
+    /**
+     * Helper method to encapsulate conditional repository delegation.
+     */
+    private Flux<User> fetchUsers(ListUsersQuery query, Pageable pageable) {
+        if (query.status() != null) {
+            return userRepository.findByTenantIdAndStatus(
+                    query.tenantId(),
+                    query.status(),
+                    pageable
+            );
+        }
+        return userRepository.findByTenantId(query.tenantId(), pageable);
+    }
+}

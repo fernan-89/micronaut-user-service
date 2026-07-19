@@ -18,16 +18,7 @@ import java.util.Objects;
 
 /**
  * Application Interactor: Implementation of the {@link UpdateUserUseCase} input port.
- * This service orchestrates the modification of a user's biographical profile metadata.
- * It strictly separates profile updates from security-critical lifecycle transitions
- * and ensures that every mutation is historically documented for compliance.
- *
- * <p><b>Architectural Principles (Mission-Critical Pattern):</b></p>
- * <ul>
- *     <li><b>Immutable State Management:</b> Functional mutation through the domain aggregate.</li>
- *     <li><b>Forensic Integrity:</b> Mandatory append-only audit trail for every mutation.</li>
- *     <li><b>Reactive Flow:</b> Fully non-blocking execution utilizing Project Reactor.</li>
- * </ul>
+ * Orchestrates the mutation of identity metadata with strict auditability.
  */
 @Slf4j
 @Singleton
@@ -36,23 +27,13 @@ public class UpdateUserInteractor implements UpdateUserUseCase {
     private final UserRepositoryPort userRepository;
     private final UserAuditRepositoryPort auditRepository;
 
-    /**
-     * Explicit constructor injection for AOT compliance and dependency clarity.
-     */
     @Inject
     public UpdateUserInteractor(UserRepositoryPort userRepository,
                                 UserAuditRepositoryPort auditRepository) {
-        this.userRepository = userRepository;
-        this.auditRepository = auditRepository;
+        this.userRepository = Objects.requireNonNull(userRepository);
+        this.auditRepository = Objects.requireNonNull(auditRepository);
     }
 
-    /**
-     * Executes the profile update orchestration pipeline.
-     *
-     * @param command The validated intent to modify biographical metadata.
-     * @return A {@link Mono} emitting the updated {@link User} aggregate state.
-     * @throws BusinessException if the target identity is not found.
-     */
     @Override
     @Nonnull
     public Mono<User> execute(@Nonnull UpdateUserCommand command) {
@@ -65,29 +46,28 @@ public class UpdateUserInteractor implements UpdateUserUseCase {
                     return Mono.error(new BusinessException("USER_NOT_FOUND",
                             "The specified identity does not exist in the organizational registry."));
                 }))
-                .map(existingUser -> existingUser.updateProfile(command.profile(), command.executor()))
+                // A lógica de negócio reside no objeto de domínio
+                .map(user -> user.updateProfile(command.profile(), command.executor()))
+                // Persistência delegada: o adaptador cuida do mapeamento para Entidade
                 .flatMap(userRepository::update)
                 .flatMap(updatedUser -> registerForensicAudit(updatedUser, command.executor())
                         .thenReturn(updatedUser))
-                .doOnSubscribe(s -> log.info("[ACTION: UPDATE_USER_PROFILE] [ID: {}] - Initiating metadata mutation protocol.",
+                .doOnSubscribe(s -> log.info("[ACTION: UPDATE_USER_PROFILE] [ID: {}] - Initiating metadata mutation.",
                         command.userId()))
-                .doOnSuccess(user -> log.info("[ACTION: UPDATE_USER_PROFILE] [ID: {}] - Mutation successfully synchronized and audited.",
+                .doOnSuccess(user -> log.info("[ACTION: UPDATE_USER_PROFILE] [ID: {}] - Mutation synchronized and audited.",
                         user.id()))
                 .doOnError(error -> {
                     if (!(error instanceof BusinessException)) {
-                        log.error("[ACTION: UPDATE_USER_PROFILE] [ID: {}] - Critical failure during synchronization: {}",
+                        log.error("[ACTION: UPDATE_USER_PROFILE] [ID: {}] - Critical synchronization failure: {}",
                                 command.userId(), error.getMessage());
                     }
                 });
     }
 
-    /**
-     * Creates and persists the immutable forensic record for the profile update.
-     */
     private Mono<UserAudit> registerForensicAudit(User user, String executor) {
         UserAudit auditEntry = UserAudit.create(
-                user.tenantId().toString(),
-                user.id().toString(),
+                user.tenantId(),
+                user.id(),
                 "USER_PROFILE_UPDATE",
                 "SUCCESS",
                 executor,

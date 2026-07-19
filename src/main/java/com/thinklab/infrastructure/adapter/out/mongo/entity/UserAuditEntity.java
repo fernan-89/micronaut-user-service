@@ -74,10 +74,10 @@ public record UserAuditEntity(
      */
     public static UserAuditEntity fromDomain(@Nonnull UserAudit domain) {
         return new UserAuditEntity(
-                UUID.fromString(domain.id()),
+                domain.id(),         // Removido o UUID.fromString()
                 domain.txId(),
-                UUID.fromString(domain.tenantId()),
-                UUID.fromString(domain.userId()),
+                domain.tenantId(),   // Removido o UUID.fromString()
+                domain.userId(),     // Removido o UUID.fromString()
                 domain.operation(),
                 domain.status(),
                 domain.executorId(),
@@ -92,10 +92,10 @@ public record UserAuditEntity(
      */
     public UserAudit toDomain() {
         return new UserAudit(
-                this.id.toString(),
+                this.id,             // Removido o .toString()
                 this.txId,
-                this.tenantId.toString(),
-                this.userId.toString(),
+                this.tenantId,       // Removido o .toString()
+                this.userId,         // Removido o .toString()
                 this.operation,
                 this.status,
                 this.executorId,

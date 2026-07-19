@@ -12,13 +12,15 @@ import java.util.UUID;
 /**
  * Application Output Port: Repository contract for the {@link User} aggregate persistence.
  * This interface defines the mandatory storage behavior for Enterprise Identities,
- * ensuring that the Core Domain remains strictly decoupled from persistence
- * frameworks or specific database drivers (e.g., MongoDB).
+ * ensuring that the Core Domain remains strictly decoupled from infrastructure
+ * frameworks or specific database drivers (e.g., MongoDB, PostgreSQL).
  *
  * <p><b>Architectural Constraints (ADR 001/002):</b></p>
  * <ul>
+ *     <li><b>Domain Sovereignty:</b> Accepts and returns only {@link User} domain aggregates;
+ *         mapping to persistence entities is the responsibility of the infrastructure adapters.</li>
  *     <li><b>Mutational Integrity:</b> Distinguished methods for creation vs. update
- *         to prevent primary ID collisions.</li>
+ *         to prevent primary ID collisions and ensure version control.</li>
  *     <li><b>Reactive Flow:</b> Strictly utilizes Mono and Flux to maintain
  *         non-blocking I/O across the entire pipeline.</li>
  *     <li><b>Data Isolation:</b> Queries are engineered to support multi-tenant
@@ -39,8 +41,7 @@ public interface UserRepositoryPort {
 
     /**
      * Commits state mutations for an existing identity (Status, Profile, or Roles).
-     * This method enforces 'replaceOne' or partial update semantics to protect
-     * against concurrency conflicts.
+     * This method enforces atomic update semantics to protect against concurrency conflicts.
      *
      * @param user The mutated aggregate root carrying the updated state and version.
      * @return A {@link Mono} emitting the synchronized {@link User} state.

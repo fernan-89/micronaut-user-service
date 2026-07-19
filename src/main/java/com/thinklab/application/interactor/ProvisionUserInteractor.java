@@ -7,6 +7,7 @@ import com.thinklab.application.usecase.command.ProvisionUserCommand;
 import com.thinklab.domain.exception.BusinessException;
 import com.thinklab.domain.model.User;
 import com.thinklab.domain.model.UserAudit;
+import com.thinklab.infrastructure.adapter.out.mongo.mapper.UserMapper;
 import jakarta.annotation.Nonnull;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -36,15 +37,18 @@ public class ProvisionUserInteractor implements ProvisionUserUseCase {
 
     private final UserRepositoryPort userRepository;
     private final UserAuditRepositoryPort auditRepository;
+    private final UserMapper userMapper;
 
     /**
      * Explicit constructor injection to ensure AOT compatibility and DI resilience.
      */
     @Inject
     public ProvisionUserInteractor(UserRepositoryPort userRepository,
-                                   UserAuditRepositoryPort auditRepository) {
+                                   UserAuditRepositoryPort auditRepository,
+                                   UserMapper userMapper) {
         this.userRepository = userRepository;
         this.auditRepository = auditRepository;
+        this.userMapper = userMapper;
     }
 
     /**
@@ -83,7 +87,6 @@ public class ProvisionUserInteractor implements ProvisionUserUseCase {
      * Internal logic for aggregate instantiation and dual-port persistence.
      */
     private Mono<User> performProvisioning(ProvisionUserCommand command) {
-        // Domain Factory: Generates UUID and initial state internally
         User newUser = User.provision(
                 command.tenantId(),
                 command.parentId(),
@@ -93,10 +96,12 @@ public class ProvisionUserInteractor implements ProvisionUserUseCase {
                 command.executor()
         );
 
+        // O repository já recebe o domínio (User) e retorna o domínio (User)
+        // O Adapter dentro da infraestrutura cuida da conversão toEntity/toDomain
         return userRepository.save(newUser)
                 .flatMap(savedUser -> registerForensicAudit(savedUser, command.executor())
                         .thenReturn(savedUser))
-                .doOnSuccess(user -> log.info("[ACTION: PROVISION_USER] [ID: {}] - Provisioning successfully completed and audited.",
+                .doOnSuccess(user -> log.info("[ACTION: PROVISION_USER] [ID: {}] - Provisioning successfully completed.",
                         user.id()));
     }
 
@@ -105,8 +110,8 @@ public class ProvisionUserInteractor implements ProvisionUserUseCase {
      */
     private Mono<UserAudit> registerForensicAudit(User user, String executor) {
         UserAudit auditEntry = UserAudit.create(
-                user.tenantId().toString(),
-                user.id().toString(),
+                user.tenantId(),
+                user.id(), // UUID passado diretamente
                 "USER_PROVISIONING",
                 "SUCCESS",
                 executor,

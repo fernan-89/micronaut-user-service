@@ -18,18 +18,7 @@ import java.util.Objects;
 
 /**
  * Application Interactor: Implementation of the {@link UpdateUserRolesUseCase} input port.
- * This service orchestrates the modification of functional roles and permissions
- * for an Enterprise Identity. It enforces a strict security boundary, ensuring
- * that any change to a user's access matrix is validated by domain invariants,
- * committed using optimistic locking, and documented via a mandatory forensic
- * audit trail for Tier 3 compliance.
- *
- * <p><b>Architectural Principles (Mission-Critical Pattern):</b></p>
- * <ul>
- *     <li><b>Least Privilege Governance:</b> Mutations are enforced by the Aggregate Root.</li>
- *     <li><b>Forensic Integrity:</b> Mandatory business justification for every role change.</li>
- *     <li><b>Reactive Sovereignty:</b> Zero-blocking execution utilizing Project Reactor.</li>
- * </ul>
+ * Orchestrates security-sensitive privilege mutations with strict forensic integrity.
  */
 @Slf4j
 @Singleton
@@ -38,24 +27,13 @@ public class UpdateUserRolesInteractor implements UpdateUserRolesUseCase {
     private final UserRepositoryPort userRepository;
     private final UserAuditRepositoryPort auditRepository;
 
-    /**
-     * Explicit constructor injection to satisfy NASA-level DI requirements
-     * and ensure Ahead-of-Time (AOT) compatibility.
-     */
     @Inject
     public UpdateUserRolesInteractor(UserRepositoryPort userRepository,
                                      UserAuditRepositoryPort auditRepository) {
-        this.userRepository = userRepository;
-        this.auditRepository = auditRepository;
+        this.userRepository = Objects.requireNonNull(userRepository);
+        this.auditRepository = Objects.requireNonNull(auditRepository);
     }
 
-    /**
-     * Executes the privilege mutation orchestration.
-     *
-     * @param command The validated intent to update user roles.
-     * @return A {@link Mono} emitting the mutated {@link User} aggregate state.
-     * @throws BusinessException if the user is not found or domain invariants are violated.
-     */
     @Override
     @Nonnull
     public Mono<User> execute(@Nonnull UpdateUserRolesCommand command) {
@@ -68,7 +46,9 @@ public class UpdateUserRolesInteractor implements UpdateUserRolesUseCase {
                     return Mono.error(new BusinessException("USER_NOT_FOUND",
                             "The target identity does not exist in the organizational registry."));
                 }))
-                .map(existingUser -> existingUser.updateRoles(command.roles(), command.executor(), command.reason()))
+                // A lógica de autorização é aplicada no agregado de domínio
+                .map(user -> user.updateRoles(command.roles(), command.executor(), command.reason()))
+                // Persistência delegada: o repositório lida com o mapeamento para Entidade
                 .flatMap(userRepository::update)
                 .flatMap(updatedUser -> registerForensicAudit(updatedUser, command.executor(), command.reason())
                         .thenReturn(updatedUser))
@@ -84,13 +64,10 @@ public class UpdateUserRolesInteractor implements UpdateUserRolesUseCase {
                 });
     }
 
-    /**
-     * Internal logic to persist the immutable forensic audit for the authorization change.
-     */
     private Mono<UserAudit> registerForensicAudit(User user, String executor, String reason) {
         UserAudit auditEntry = UserAudit.create(
-                user.tenantId().toString(),
-                user.id().toString(),
+                user.tenantId(),
+                user.id(),
                 "USER_ROLES_UPDATE",
                 "SUCCESS",
                 executor,

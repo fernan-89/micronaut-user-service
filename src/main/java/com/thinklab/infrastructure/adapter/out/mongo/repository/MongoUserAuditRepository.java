@@ -2,7 +2,7 @@ package com.thinklab.infrastructure.adapter.out.mongo.repository;
 
 import com.thinklab.infrastructure.adapter.out.mongo.entity.UserAuditEntity;
 import io.micronaut.data.mongodb.annotation.MongoRepository;
-import io.micronaut.data.repository.reactive.ReactiveMongoRepository;
+import io.micronaut.data.repository.reactive.ReactorCrudRepository; // <-- IMPORT CORRETO ADICIONADO
 import jakarta.annotation.Nonnull;
 import reactor.core.publisher.Flux;
 
@@ -21,9 +21,8 @@ import java.util.UUID;
  *     <li><b>Reactive Egress:</b> Utilizes Flux for backpressure-aware audit streaming.</li>
  * </ul>
  */
-@MongoRepository
-public interface MongoUserAuditRepository extends ReactiveMongoRepository<UserAuditEntity, UUID> {
-
+@MongoRepository // <-- Anotação obrigatória para indicar o dialeto do banco
+public interface MongoUserAuditRepository extends ReactorCrudRepository<UserAuditEntity, UUID> { // <-- Interface estendida corretamente
     /**
      * Retrieves the complete historical timeline for a specific user within a tenant.
      * Results are ordered by timestamp descending to provide the latest events first.

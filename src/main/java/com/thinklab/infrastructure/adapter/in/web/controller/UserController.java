@@ -96,7 +96,7 @@ public class UserController {
             @QueryValue(defaultValue = "0") int page,
             @QueryValue(defaultValue = "20") int size) {
 
-        var query = new ListUsersQuery(tenantId, status, page, size);
+        var query = new ListUsersQuery(tenantId, status, null, page, size);
 
         return listUsersUseCase.execute(query)
                 .map(mapper::toResponse)

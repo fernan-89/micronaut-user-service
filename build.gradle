@@ -13,15 +13,23 @@ repositories {
 
 dependencies {
     // -------------------------------------------------------------------------
-    // Compile-time Annotations & Processors
+    // BOM Correto (Micronaut 4 alterou o nome de micronaut-bom para micronaut-platform)
     // -------------------------------------------------------------------------
+    implementation(platform("io.micronaut.platform:micronaut-platform:4.4.2"))
+
+    // -------------------------------------------------------------------------
+    // Compile-time Annotations & Processors (A ordem importa!)
+    // -------------------------------------------------------------------------
+    // Lombok deve vir primeiro para gerar getters/setters/logs
     annotationProcessor("org.projectlombok:lombok:1.18.36")
     compileOnly("org.projectlombok:lombok:1.18.36")
 
+    // Processadores do Micronaut (Versões gerenciadas automaticamente pelo platform)
+    annotationProcessor("io.micronaut.data:micronaut-data-processor")
+    annotationProcessor("io.micronaut.data:micronaut-data-document-processor")
     annotationProcessor("io.micronaut:micronaut-http-validation")
     annotationProcessor("io.micronaut.serde:micronaut-serde-processor")
     annotationProcessor("io.micronaut.validation:micronaut-validation-processor")
-    annotationProcessor("io.micronaut.data:micronaut-data-document-processor")
     annotationProcessor("io.micronaut.openapi:micronaut-openapi")
 
     // -------------------------------------------------------------------------
@@ -31,31 +39,31 @@ dependencies {
     implementation("io.micronaut:micronaut-http-client")
     implementation("io.micronaut.serde:micronaut-serde-jackson")
     implementation("io.micronaut.validation:micronaut-validation")
+    implementation("jakarta.validation:jakarta.validation-api")
     implementation("io.swagger.core.v3:swagger-annotations")
 
     // -------------------------------------------------------------------------
     // Infrastructure Layer (Persistence & Reactivity)
     // -------------------------------------------------------------------------
     implementation("io.projectreactor:reactor-core")
+
+    // O micronaut-data-mongodb já inclui as dependências reativas base e o driver
     implementation("io.micronaut.data:micronaut-data-mongodb")
-    implementation("io.micronaut.mongodb:micronaut-mongo-reactive")
-    implementation("org.mongodb:mongodb-driver-reactivestreams")
 
     // -------------------------------------------------------------------------
     // Logging & Runtime
     // -------------------------------------------------------------------------
     runtimeOnly("ch.qos.logback:logback-classic")
-    runtimeOnly("org.yaml:snakeyaml") // Required for configuration
+    runtimeOnly("org.yaml:snakeyaml") // Necessário para ler o application.yml
 
     // -------------------------------------------------------------------------
     // Testing & Quality Assurance
     // -------------------------------------------------------------------------
     testImplementation("io.micronaut:micronaut-http-client")
-    testImplementation("io.projectreactor:reactor-test") // Critical for testing Reactive Streams
+    testImplementation("io.projectreactor:reactor-test")
     testImplementation("org.mockito:mockito-core")
     testImplementation("org.mockito:mockito-junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-
 }
 
 application {
