@@ -1,47 +1,81 @@
 plugins {
-    id("io.micronaut.application") version "5.0.2"
-    id("com.gradleup.shadow") version "9.4.1"
-    id("io.micronaut.aot") version "5.0.2"
+    id("io.micronaut.application") version "4.4.2"
+    id("io.micronaut.aot") version "4.4.2"
+    id("com.gradleup.shadow") version "8.3.0"
 }
 
 version = "0.1"
 group = "com.thinklab"
-
 
 repositories {
     mavenCentral()
 }
 
 dependencies {
+    // -------------------------------------------------------------------------
+    // Compile-time Annotations & Processors
+    // -------------------------------------------------------------------------
+    annotationProcessor("org.projectlombok:lombok:1.18.36")
+    compileOnly("org.projectlombok:lombok:1.18.36")
+
     annotationProcessor("io.micronaut:micronaut-http-validation")
     annotationProcessor("io.micronaut.serde:micronaut-serde-processor")
-    implementation("io.micronaut.serde:micronaut-serde-jackson")
-    compileOnly("io.micronaut:micronaut-http-client")
-    runtimeOnly("ch.qos.logback:logback-classic")
-    testImplementation("io.micronaut:micronaut-http-client")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-}
+    annotationProcessor("io.micronaut.validation:micronaut-validation-processor")
+    annotationProcessor("io.micronaut.data:micronaut-data-document-processor")
+    annotationProcessor("io.micronaut.openapi:micronaut-openapi")
 
+    // -------------------------------------------------------------------------
+    // Core Application Layer
+    // -------------------------------------------------------------------------
+    implementation("io.micronaut:micronaut-management")
+    implementation("io.micronaut:micronaut-http-client")
+    implementation("io.micronaut.serde:micronaut-serde-jackson")
+    implementation("io.micronaut.validation:micronaut-validation")
+    implementation("io.swagger.core.v3:swagger-annotations")
+
+    // -------------------------------------------------------------------------
+    // Infrastructure Layer (Persistence & Reactivity)
+    // -------------------------------------------------------------------------
+    implementation("io.projectreactor:reactor-core")
+    implementation("io.micronaut.data:micronaut-data-mongodb")
+    implementation("io.micronaut.mongodb:micronaut-mongo-reactive")
+    implementation("org.mongodb:mongodb-driver-reactivestreams")
+
+    // -------------------------------------------------------------------------
+    // Logging & Runtime
+    // -------------------------------------------------------------------------
+    runtimeOnly("ch.qos.logback:logback-classic")
+    runtimeOnly("org.yaml:snakeyaml") // Required for configuration
+
+    // -------------------------------------------------------------------------
+    // Testing & Quality Assurance
+    // -------------------------------------------------------------------------
+    testImplementation("io.micronaut:micronaut-http-client")
+    testImplementation("io.projectreactor:reactor-test") // Critical for testing Reactive Streams
+    testImplementation("org.mockito:mockito-core")
+    testImplementation("org.mockito:mockito-junit-jupiter")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
+}
 
 application {
     mainClass = "com.thinklab.Application"
 }
 
 java {
-    sourceCompatibility = JavaVersion.toVersion("25")
-    targetCompatibility = JavaVersion.toVersion("25")
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
 }
 
-
-graalvmNative.toolchainDetection = false
 graalvmNative {
+    toolchainDetection = false
     binaries {
         all {
             buildArgs.add("-H:+SharedArenaSupport")
         }
     }
 }
-
 
 micronaut {
     runtime("netty")
@@ -51,8 +85,6 @@ micronaut {
         annotations("com.thinklab.*")
     }
     aot {
-        // Please review carefully the optimizations enabled below
-        // Check https://micronaut-projects.github.io/micronaut-aot/latest/guide/ for more details
         optimizeServiceLoading = false
         convertYamlToJava = false
         precomputeOperations = true
@@ -62,20 +94,4 @@ micronaut {
         optimizeNetty = true
         replaceLogbackXml = true
     }
-
 }
-
-tasks.named("dockerfile") {
-
-    baseImage = "eclipse-temurin:25-jre"
-}
-
-
-// https://docs.gradle.org/current/userguide/upgrading_major_version_9.html#test_task_fails_when_no_tests_are_discovered
-tasks.withType(AbstractTestTask).configureEach {
-    failOnNoDiscoveredTests = false
-}
-
-
-
-
