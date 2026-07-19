@@ -16,7 +16,7 @@ $RECYCLE.BIN/
 .gradle/
 build/
 target/
-out/
+/out/
 bin/
 *.jar
 *.war
