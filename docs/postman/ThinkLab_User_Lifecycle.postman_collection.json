@@ -1,0 +1,173 @@
+{
+	"info": {
+		"_postman_id": "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d",
+		"name": "ThinkLab User - Lifecycle Suite",
+		"description": "NASA-Level E2E Suite for User Manager Service. Covers: Provisioning -> Lifecycle (Status/Roles) -> Retrieval -> Forensic Audit.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "39879181"
+	},
+	"item": [
+		{
+			"name": "00. Infrastructure & Observability",
+			"item": [
+				{
+					"name": "Health Check",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status is UP\", () => {",
+									"    pm.response.to.have.status(200);",
+									"    pm.expect(pm.response.json().status).to.eql(\"UP\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/health",
+							"host": ["{{base_url}}"],
+							"path": ["health"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "01. User Provisioning",
+			"item": [
+				{
+					"name": "Provision Root User",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status 201 Created\", () => pm.response.to.have.status(201));",
+									"const jsonData = pm.response.json();",
+									"pm.environment.set(\"userId\", jsonData.id);",
+									"pm.environment.set(\"tenantId\", jsonData.tenantId);",
+									"pm.test(\"User ID captured for workflow\", () => pm.expect(jsonData.id).to.not.be.undefined);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"tenantId\": \"{{$guid}}\",\n    \"username\": \"admin.{{$randomUserName}}\",\n    \"level\": \"TENANT_ADMIN\",\n    \"executor\": \"{{executor}}\",\n    \"profile\": {\n        \"fullName\": \"{{$randomFullName}}\",\n        \"corporateEmail\": \"{{$randomEmail}}\",\n        \"phoneNumber\": \"+55119{{$randomInt}}8888\",\n        \"language\": \"pt-br\",\n        \"timezone\": \"America/Sao_Paulo\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/users",
+							"host": ["{{base_url}}"],
+							"path": ["users"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "02. Lifecycle Management",
+			"item": [
+				{
+					"name": "Update User Status (SUSPENDED)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status transitioned successfully\", () => pm.response.to.have.status(200));",
+									"pm.test(\"Verify new state\", () => pm.expect(pm.response.json().status).to.eql(\"SUSPENDED\"));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PATCH",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"status\": \"SUSPENDED\",\n    \"executor\": \"{{executor}}\",\n    \"reason\": \"Compliance periodic review.\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/users/{{userId}}/status",
+							"host": ["{{base_url}}"],
+							"path": ["users", "{{userId}}", "status"]
+						}
+					}
+				},
+				{
+					"name": "Update User Roles",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": ["pm.test(\"Roles updated\", () => pm.response.to.have.status(200));"]
+							}
+						}
+					],
+					"request": {
+						"method": "PATCH",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"roles\": [\"ROLE_USER\", \"ROLE_MANAGER\", \"REPORTS_VIEWER\"],\n    \"executor\": \"{{executor}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/users/{{userId}}/roles",
+							"host": ["{{base_url}}"],
+							"path": ["users", "{{userId}}", "roles"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "03. Queries & Audit",
+			"item": [
+				{
+					"name": "Get User Detail",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/users/{{userId}}?tenantId={{tenantId}}",
+							"host": ["{{base_url}}"],
+							"path": ["users", "{{userId}}"],
+							"query": [{"key": "tenantId", "value": "{{tenantId}}"}]
+						}
+					}
+				},
+				{
+					"name": "List Tenant Users (Paginated)",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/users?tenantId={{tenantId}}&page=0&size=10",
+							"host": ["{{base_url}}"],
+							"path": ["users"],
+							"query": [
+								{"key": "tenantId", "value": "{{tenantId}}"},
+								{"key": "page", "value": "0"},
+								{"key": "size", "value": "10"}
+							]
+						}
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8082"
+		}
+	]
+}

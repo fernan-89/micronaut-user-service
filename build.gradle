@@ -1,69 +1,59 @@
 plugins {
-    id("io.micronaut.application") version "4.4.2"
-    id("io.micronaut.aot") version "4.4.2"
-    id("com.gradleup.shadow") version "8.3.0"
+    id "io.micronaut.application" version "4.4.2"
+    id "io.micronaut.aot" version "4.4.2"
+    id "com.gradleup.shadow" version "8.3.0"
 }
 
 version = "0.1"
 group = "com.thinklab"
+
+// A CORREÇÃO ESTÁ AQUI: Usar 'ext' (extensão) para injetar a variável
+// de compatibilidade que o Shadow Plugin exige no Gradle 8+
+ext.mainClassName = "com.thinklab.Application"
 
 repositories {
     mavenCentral()
 }
 
 dependencies {
-    // -------------------------------------------------------------------------
-    // BOM Correto (Micronaut 4 alterou o nome de micronaut-bom para micronaut-platform)
-    // -------------------------------------------------------------------------
-    implementation(platform("io.micronaut.platform:micronaut-platform:4.4.2"))
+    // --- Annotation Processors ---
+    annotationProcessor "org.projectlombok:lombok:1.18.36"
+    compileOnly "org.projectlombok:lombok:1.18.36"
 
-    // -------------------------------------------------------------------------
-    // Compile-time Annotations & Processors (A ordem importa!)
-    // -------------------------------------------------------------------------
-    // Lombok deve vir primeiro para gerar getters/setters/logs
-    annotationProcessor("org.projectlombok:lombok:1.18.36")
-    compileOnly("org.projectlombok:lombok:1.18.36")
+    annotationProcessor "io.micronaut.data:micronaut-data-document-processor"
+    annotationProcessor "io.micronaut:micronaut-http-validation"
+    annotationProcessor "io.micronaut.serde:micronaut-serde-processor"
+    annotationProcessor "io.micronaut.validation:micronaut-validation-processor"
+    annotationProcessor "io.micronaut.openapi:micronaut-openapi"
 
-    // Processadores do Micronaut (Versões gerenciadas automaticamente pelo platform)
-    annotationProcessor("io.micronaut.data:micronaut-data-processor")
-    annotationProcessor("io.micronaut.data:micronaut-data-document-processor")
-    annotationProcessor("io.micronaut:micronaut-http-validation")
-    annotationProcessor("io.micronaut.serde:micronaut-serde-processor")
-    annotationProcessor("io.micronaut.validation:micronaut-validation-processor")
-    annotationProcessor("io.micronaut.openapi:micronaut-openapi")
+    // --- Core ---
+    implementation "io.micronaut:micronaut-management"
+    implementation "io.micronaut:micronaut-http-client"
+    implementation "io.micronaut.serde:micronaut-serde-jackson"
+    implementation "io.micronaut.validation:micronaut-validation"
 
-    // -------------------------------------------------------------------------
-    // Core Application Layer
-    // -------------------------------------------------------------------------
-    implementation("io.micronaut:micronaut-management")
-    implementation("io.micronaut:micronaut-http-client")
-    implementation("io.micronaut.serde:micronaut-serde-jackson")
-    implementation("io.micronaut.validation:micronaut-validation")
-    implementation("jakarta.validation:jakarta.validation-api")
-    implementation("io.swagger.core.v3:swagger-annotations")
+    // Swagger
+    compileOnly "io.swagger.core.v3:swagger-annotations"
 
-    // -------------------------------------------------------------------------
-    // Infrastructure Layer (Persistence & Reactivity)
-    // -------------------------------------------------------------------------
-    implementation("io.projectreactor:reactor-core")
+    // --- Infrastructure (Database) ---
+    implementation "io.micronaut.data:micronaut-data-mongodb"
+    implementation "io.projectreactor:reactor-core"
 
-    // O micronaut-data-mongodb já inclui as dependências reativas base e o driver
-    implementation("io.micronaut.data:micronaut-data-mongodb")
+    // Drivers do MongoDB
+    implementation "org.mongodb:mongodb-driver-reactivestreams"
+    implementation "org.mongodb:mongodb-driver-sync"
+    implementation "org.mongodb:mongodb-driver-core"
 
-    // -------------------------------------------------------------------------
-    // Logging & Runtime
-    // -------------------------------------------------------------------------
-    runtimeOnly("ch.qos.logback:logback-classic")
-    runtimeOnly("org.yaml:snakeyaml") // Necessário para ler o application.yml
+    // --- Logging & Runtime ---
+    runtimeOnly "ch.qos.logback:logback-classic"
+    runtimeOnly "org.yaml:snakeyaml"
 
-    // -------------------------------------------------------------------------
-    // Testing & Quality Assurance
-    // -------------------------------------------------------------------------
-    testImplementation("io.micronaut:micronaut-http-client")
-    testImplementation("io.projectreactor:reactor-test")
-    testImplementation("org.mockito:mockito-core")
-    testImplementation("org.mockito:mockito-junit-jupiter")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    // --- Testing ---
+    testImplementation "io.micronaut:micronaut-http-client"
+    testImplementation "io.projectreactor:reactor-test"
+    testImplementation "org.mockito:mockito-core"
+    testImplementation "org.mockito:mockito-junit-jupiter"
+    testImplementation "org.junit.jupiter:junit-jupiter-params"
 }
 
 application {
@@ -79,7 +69,7 @@ java {
 graalvmNative {
     toolchainDetection = false
     binaries {
-        all {
+        main {
             buildArgs.add("-H:+SharedArenaSupport")
         }
     }

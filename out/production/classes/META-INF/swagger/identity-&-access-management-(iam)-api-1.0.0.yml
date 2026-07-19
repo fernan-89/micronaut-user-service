@@ -1,0 +1,457 @@
+openapi: 3.0.1
+info:
+  title: Identity & Access Management (IAM) API
+  description: "Reactive mission-critical service for managing users, roles, and hierarchical\
+    \ tenant-based identities."
+  contact:
+    name: Thinklab Staff Engineering
+    email: staff@thinklab.com
+  license:
+    name: Apache 2.0
+    url: https://thinklab.com/licenses/LICENSE-2.0
+  version: 1.0.0
+tags:
+- name: Identity Management API
+  description: "Endpoints for orchestrating user provisioning, lifecycle transitions,\
+    \ and hierarchical discovery."
+paths:
+  /users:
+    get:
+      tags:
+      - Identity Management API
+      summary: List tenant users
+      description: Streams a paginated subset of identities scoped strictly to the
+        organization header.
+      operationId: list
+      parameters:
+      - name: X-Tenant-Id
+        in: header
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: status
+        in: query
+        schema:
+          nullable: true
+          allOf:
+          - $ref: "#/components/schemas/UserStatus"
+      - name: page
+        in: query
+        required: true
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: size
+        in: query
+        required: true
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      responses:
+        "200":
+          description: Paginated stream retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedUserResponse"
+    post:
+      tags:
+      - Identity Management API
+      summary: Provision user
+      description: Establishes a new identity with mandatory forensic auditing and
+        tenant isolation.
+      operationId: provision
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProvisionUserRequest"
+        required: true
+      responses:
+        "201":
+          description: Identity provisioned and audited successfully.
+        "400":
+          description: Invalid payload or validation failure.
+  /users/{id}:
+    get:
+      tags:
+      - Identity Management API
+      summary: Get user by ID
+      description: Retrieves current metadata and state for a specific identity within
+        a tenant context.
+      operationId: getById
+      parameters:
+      - name: X-Tenant-Id
+        in: header
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: id
+        in: path
+        description: The UUID of the target user
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Identity located and projected.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "404":
+          description: Identity not found in this organizational context.
+    put:
+      tags:
+      - Identity Management API
+      summary: Update biographical profile
+      description: Mutates non-security biographical metadata. Fully audited operation.
+      operationId: update
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+        required: true
+      responses:
+        "200":
+          description: Metadata successfully synchronized.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+  /users/{id}/roles:
+    patch:
+      tags:
+      - Identity Management API
+      summary: Mutate access matrix
+      description: Updates functional roles and privileges. High-severity security
+        operation with mandatory auditing.
+      operationId: updateRoles
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRolesRequest"
+        required: true
+      responses:
+        "200":
+          description: Authorization matrix successfully synchronized.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+  /users/{id}/status:
+    patch:
+      tags:
+      - Identity Management API
+      summary: Transition lifecycle status
+      description: "Orchestrates critical state machine transitions (e.g., SUSPEND,\
+        \ ACTIVATE). Requires business justification."
+      operationId: updateStatus
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserStatusRequest"
+        required: true
+      responses:
+        "200":
+          description: State transition committed and audited.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+components:
+  schemas:
+    PagedUserResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          description: The list of sanitized user identities for the current page
+          items:
+            $ref: "#/components/schemas/UserResponse"
+        totalElements:
+          type: integer
+          description: The total count of identities matching the criteria across
+            all pages
+          format: int64
+          example: 1250
+        page:
+          type: integer
+          description: The current zero-indexed page number
+          format: int32
+          example: 0
+        size:
+          type: integer
+          description: The maximum number of items requested for this page
+          format: int32
+          example: 20
+      description: Paginated container representing a subset of the Enterprise Identity
+        registry with navigation metadata.
+    ProvisionUserRequest:
+      required:
+      - email
+      - executor
+      - level
+      - profile
+      - tenantId
+      - username
+      type: object
+      properties:
+        tenantId:
+          type: string
+          description: The isolated organizational context ID
+          format: uuid
+          example: 7c6b0035-2033-4ac5-9658-9060fd1f7a1e
+        parentId:
+          type: string
+          description: Optional parent unit ID for hierarchical associations
+          format: uuid
+          nullable: true
+          example: af9c2b03-384d-3a6d-8465-64ba383d3bad
+        username:
+          maxLength: 50
+          minLength: 3
+          type: string
+          description: Unique system login name
+          example: john.doe
+        email:
+          minLength: 1
+          type: string
+          description: Primary corporate contact email
+          format: email
+          example: john.doe@thinklab.com
+        level:
+          allOf:
+          - $ref: "#/components/schemas/UserLevel"
+          - description: Hierarchical level defining global authority
+        profile:
+          allOf:
+          - $ref: "#/components/schemas/UserProfile"
+          - description: Biographical and localization metadata
+        executor:
+          minLength: 1
+          type: string
+          description: The agent (admin or service) authorizing this action
+          example: iam-admin-01
+      description: Payload required to initiate the provisioning of a new user identity
+        within a tenant context.
+    UpdateUserRequest:
+      required:
+      - executor
+      - profile
+      type: object
+      properties:
+        profile:
+          allOf:
+          - $ref: "#/components/schemas/UserProfile"
+          - description: The new biographical and localization state for the identity
+        executor:
+          maxLength: 100
+          minLength: 1
+          type: string
+          description: The agent (admin or service) authorizing this mutation
+          example: iam-admin-02
+      description: Payload required to modify the biographical metadata of an existing
+        Enterprise Identity.
+    UpdateUserRolesRequest:
+      required:
+      - executor
+      - reason
+      - roles
+      type: object
+      properties:
+        roles:
+          minItems: 1
+          type: array
+          description: The new complete set of functional roles for the user
+          example: "[\"OPERATOR\", \"REPORTS_VIEWER\"]"
+          items:
+            type: string
+        executor:
+          maxLength: 100
+          minLength: 1
+          type: string
+          description: The agent (admin or service) authorizing this authorization
+            change
+          example: security-admin-01
+        reason:
+          maxLength: 500
+          minLength: 5
+          type: string
+          description: Detailed justification for the change in access rights
+          example: Promotion to regional supervisor unit.
+      description: Payload required to modify the collection of functional roles assigned
+        to an identity.
+    UpdateUserStatusRequest:
+      required:
+      - executor
+      - reason
+      - status
+      type: object
+      properties:
+        status:
+          allOf:
+          - $ref: "#/components/schemas/UserStatus"
+          - description: The intended new state for the identity
+        executor:
+          maxLength: 100
+          minLength: 1
+          type: string
+          description: The agent (admin or service) authorizing this state change
+          example: security-officer-01
+        reason:
+          maxLength: 500
+          minLength: 5
+          type: string
+          description: Detailed justification for the lifecycle transition
+          example: Excessive failed login attempts detected.
+      description: "Payload required to transition an identity between operational\
+        \ states (e.g., ACTIVE to SUSPENDED)."
+    UserLevel:
+      type: string
+      description: Hierarchical level defining global authority
+      enum:
+      - SYSTEM_ADMIN
+      - TENANT_ADMIN
+      - BRANCH_MANAGER
+      - OPERATOR
+    UserProfile:
+      required:
+      - corporateEmail
+      - fullName
+      - preferredLanguage
+      - timezone
+      type: object
+      properties:
+        fullName:
+          type: string
+        corporateEmail:
+          type: string
+        phoneNumber:
+          type: string
+          nullable: true
+        preferredLanguage:
+          type: string
+        timezone:
+          type: string
+      description: Biographical and localization metadata
+    UserResponse:
+      required:
+      - createdAt
+      - createdBy
+      - id
+      - level
+      - mfaEnabled
+      - profile
+      - roles
+      - status
+      - tenantId
+      - username
+      - version
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique system identifier (UUID)
+          format: uuid
+          example: 7c6b0035-2033-4ac5-9658-9060fd1f7a1e
+        tenantId:
+          type: string
+          description: Isolated organizational context identifier
+          format: uuid
+          example: af9c2b03-384d-3a6d-8465-64ba383d3bad
+        parentId:
+          type: string
+          description: Optional identifier of the parent business unit
+          format: uuid
+          nullable: true
+          example: 79e83370-d699-4d28-817f-acc401490ed5
+        username:
+          type: string
+          description: Unique system login name
+          example: john.doe
+        status:
+          allOf:
+          - $ref: "#/components/schemas/UserStatus"
+          - description: Current lifecycle status
+            example: ACTIVE
+        level:
+          allOf:
+          - $ref: "#/components/schemas/UserLevel"
+          - description: Hierarchical level defining global authority
+            example: OPERATOR
+        profile:
+          allOf:
+          - $ref: "#/components/schemas/UserProfile"
+          - description: Consolidated biographical and localization metadata
+        roles:
+          type: array
+          description: Collection of assigned functional roles
+          example: "[\"REPORTS_VIEWER\"]"
+          items:
+            type: string
+        mfaEnabled:
+          type: boolean
+          description: Identity was provisioned with MFA protection active
+        createdBy:
+          type: string
+          description: Identifier of the agent who provisioned this identity
+        createdAt:
+          type: string
+          description: UTC timestamp of initial provisioning
+          format: date-time
+        updatedBy:
+          type: string
+          description: Identifier of the last agent to mutate this identity
+          nullable: true
+        updatedAt:
+          type: string
+          description: UTC timestamp of the last administrative mutation
+          format: date-time
+          nullable: true
+        version:
+          type: integer
+          description: Concurrency control version for consistency tracking
+          format: int64
+          example: 1
+      description: Standardized response payload representing an identity's state
+        and its global localization metadata.
+    UserStatus:
+      type: string
+      description: Current lifecycle status
+      example: ACTIVE
+      enum:
+      - ACTIVE
+      - SUSPENDED
+      - BLOCKED
+      - PENDING_ACTIVATION
+      - REVOKED
