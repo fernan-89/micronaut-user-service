@@ -12,10 +12,6 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Command Unit Test: Validates the boundary defense and input sanitization
  * of the {@link ProvisionUserCommand}.
- *
- * <p>This suite ensures that the command, acting as the primary input port,
- * strictly enforces nullability contracts and sanitizes biographical data
- * to prevent domain contamination.</p>
  */
 @DisplayName("Application: ProvisionUser Command")
 class ProvisionUserCommandTest {
@@ -30,7 +26,7 @@ class ProvisionUserCommandTest {
         String rawUsername = "  john.doe  ";
         String rawEmail = " JOHN.DOE@THINKLAB.COM ";
 
-        // When
+        // When: Ordem correta (tenantId, parentId, username, email, level, profile, executor)
         var command = new ProvisionUserCommand(
                 tenantId,
                 null,

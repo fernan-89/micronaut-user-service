@@ -26,8 +26,6 @@ import static org.mockito.Mockito.*;
 
 /**
  * Application Unit Test: Validates the lifecycle orchestration logic of the {@link UpdateUserStatusInteractor}.
- * This suite ensures that state transitions are strictly governed by domain FSM rules,
- * committed to persistence, and transactionally linked to the mandatory forensic audit trail.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Application: UpdateUserStatus Interactor")
@@ -54,21 +52,18 @@ class UpdateUserStatusInteractorTest {
     @Test
     @DisplayName("Should successfully transition user status and register forensic audit")
     void shouldUpdateStatusSuccessfully() {
-        // Given: An active user identity
         var profile = new UserProfile("John Doe", "john@thinklab.com", null, "en", "UTC");
         var activeUser = User.provision(tenantId, null, "john.doe", UserLevel.OPERATOR, profile, "system")
                 .activate("system");
 
-        var command = new UpdateUserStatusCommand(tenantId, userId, UserStatus.SUSPENDED, executor, reason);
+        var command = new UpdateUserStatusCommand(userId, UserStatus.SUSPENDED, executor, reason);
 
         when(userRepository.findByIdAndTenantId(userId, tenantId)).thenReturn(Mono.just(activeUser));
         when(userRepository.update(any(User.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
         when(auditRepository.save(any())).thenReturn(Mono.empty());
 
-        // When
         var result = interactor.execute(command);
 
-        // Then
         StepVerifier.create(result)
                 .assertNext(updatedUser -> {
                     assert updatedUser.status() == UserStatus.SUSPENDED;
@@ -83,14 +78,11 @@ class UpdateUserStatusInteractorTest {
     @Test
     @DisplayName("Should fail when identity is missing in organizational context")
     void shouldFailWhenUserNotFound() {
-        // Given
-        var command = new UpdateUserStatusCommand(tenantId, userId, UserStatus.ACTIVE, executor, reason);
+        var command = new UpdateUserStatusCommand(userId, UserStatus.ACTIVE, executor, reason);
         when(userRepository.findByIdAndTenantId(userId, tenantId)).thenReturn(Mono.empty());
 
-        // When
         var result = interactor.execute(command);
 
-        // Then
         StepVerifier.create(result)
                 .expectError(UserNotFoundException.class)
                 .verify();
@@ -100,17 +92,17 @@ class UpdateUserStatusInteractorTest {
     }
 
     @Test
-    @DisplayName("Should fail when domain machine prohibits the transition (e.g., ARCHIVED -> ACTIVE)")
+    @DisplayName("Should fail when domain machine prohibits the transition (e.g., ACTIVE -> PENDING_ACTIVATION)")
     void shouldFailOnIllegalTransition() {
-        // Given: An archived user
+        // Given: An active user
         var profile = new UserProfile("John Doe", "john@thinklab.com", null, "en", "UTC");
-        var archivedUser = User.provision(tenantId, null, "john.doe", UserLevel.OPERATOR, profile, "system")
-                .activate("system")
-                .archive("system");
+        var activeUser = User.provision(tenantId, null, "john.doe", UserLevel.OPERATOR, profile, "system")
+                .activate("system");
 
-        var command = new UpdateUserStatusCommand(tenantId, userId, UserStatus.ACTIVE, executor, "Illegal attempt");
+        // Tentativa de transição ilegal: PENDING_ACTIVATION não é permitido a partir de ACTIVE
+        var command = new UpdateUserStatusCommand(userId, UserStatus.PENDING_ACTIVATION, executor, "Illegal attempt");
 
-        when(userRepository.findByIdAndTenantId(userId, tenantId)).thenReturn(Mono.just(archivedUser));
+        when(userRepository.findByIdAndTenantId(userId, tenantId)).thenReturn(Mono.just(activeUser));
 
         // When
         var result = interactor.execute(command);
@@ -134,18 +126,15 @@ class UpdateUserStatusInteractorTest {
     @Test
     @DisplayName("Should propagate infrastructure errors and abort audit trail")
     void shouldPropagatePersistenceError() {
-        // Given
         var profile = new UserProfile("John Doe", "john@thinklab.com", null, "en", "UTC");
         var activeUser = User.provision(tenantId, null, "john.doe", UserLevel.OPERATOR, profile, "system");
-        var command = new UpdateUserStatusCommand(tenantId, userId, UserStatus.ACTIVE, executor, reason);
+        var command = new UpdateUserStatusCommand(userId, UserStatus.ACTIVE, executor, reason);
 
         when(userRepository.findByIdAndTenantId(userId, tenantId)).thenReturn(Mono.just(activeUser));
         when(userRepository.update(any())).thenReturn(Mono.error(new RuntimeException("MongoDB Read-Only Mode")));
 
-        // When
         var result = interactor.execute(command);
 
-        // Then
         StepVerifier.create(result)
                 .expectErrorMessage("MongoDB Read-Only Mode")
                 .verify();

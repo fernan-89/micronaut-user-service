@@ -25,9 +25,6 @@ import static org.mockito.Mockito.*;
 
 /**
  * Application Unit Test: Validates the retrieval orchestration of the {@link ListUsersInteractor}.
- * This suite ensures that paginated discovery correctly routes queries based on status filters
- * and strictly enforces multi-tenant isolation boundaries in accordance with
- * NASA-level security standards.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Application: ListUsers Interactor")
@@ -39,7 +36,7 @@ class ListUsersInteractorTest {
     private ListUsersInteractor interactor;
 
     private final UUID tenantId = UUID.randomUUID();
-    private final UserProfile profile = new UserProfile("Test User", "test@thinklab.com", null, "en", "UTC");
+    private final UserProfile profile = new UserProfile("Test", "User", "test@thinklab.com", "123456", "Doc123");
     private final User userMock = User.provision(tenantId, null, "test.user", UserLevel.OPERATOR, profile, "admin");
 
     @BeforeEach
@@ -51,8 +48,10 @@ class ListUsersInteractorTest {
     @DisplayName("Should route to status-filtered repository method when status is provided in query")
     void shouldListWithStatusFilter() {
         // Given: A query containing a specific status filter
-        var query = new ListUsersQuery(tenantId, UserStatus.ACTIVE, 0, 10);
-        when(userRepository.findAllByTenantIdAndStatus(eq(tenantId), eq(UserStatus.ACTIVE), any(Pageable.class)))
+        // Passando 'null' para UserLevel se não quiser filtrar por nível, ou especifique um
+        var query = new ListUsersQuery(tenantId, UserStatus.ACTIVE, null, 0, 10);
+
+        when(userRepository.findByTenantIdAndStatus(eq(tenantId), eq(UserStatus.ACTIVE), any(Pageable.class)))
                 .thenReturn(Flux.just(userMock));
 
         // When
@@ -63,16 +62,17 @@ class ListUsersInteractorTest {
                 .expectNext(userMock)
                 .verifyComplete();
 
-        verify(userRepository, times(1)).findAllByTenantIdAndStatus(eq(tenantId), eq(UserStatus.ACTIVE), any(Pageable.class));
-        verify(userRepository, never()).findAllByTenantId(any(), any());
+        verify(userRepository, times(1)).findByTenantIdAndStatus(eq(tenantId), eq(UserStatus.ACTIVE), any(Pageable.class));
+        verify(userRepository, never()).findByTenantId(any(), any());
     }
 
     @Test
     @DisplayName("Should route to generic tenant listing when status filter is absent")
     void shouldListWithoutStatusFilter() {
-        // Given: A query without status constraints
-        var query = new ListUsersQuery(tenantId, null, 0, 10);
-        when(userRepository.findAllByTenantId(eq(tenantId), any(Pageable.class)))
+        // Given
+        var query = new ListUsersQuery(tenantId, null, null, 0, 10);
+
+        when(userRepository.findByTenantId(eq(tenantId), any(Pageable.class)))
                 .thenReturn(Flux.just(userMock));
 
         // When
@@ -83,16 +83,17 @@ class ListUsersInteractorTest {
                 .expectNext(userMock)
                 .verifyComplete();
 
-        verify(userRepository, times(1)).findAllByTenantId(eq(tenantId), any(Pageable.class));
-        verify(userRepository, never()).findAllByTenantIdAndStatus(any(), any(), any());
+        verify(userRepository, times(1)).findByTenantId(eq(tenantId), any(Pageable.class));
+        verify(userRepository, never()).findByTenantIdAndStatus(any(), any(), any());
     }
 
     @Test
     @DisplayName("Should emit empty flux signal when no identities match the discovery criteria")
     void shouldReturnEmptyFlux() {
         // Given
-        var query = new ListUsersQuery(tenantId, null, 0, 10);
-        when(userRepository.findAllByTenantId(eq(tenantId), any(Pageable.class)))
+        var query = new ListUsersQuery(tenantId, null, null, 0, 10);
+
+        when(userRepository.findByTenantId(eq(tenantId), any(Pageable.class)))
                 .thenReturn(Flux.empty());
 
         // When
@@ -115,9 +116,10 @@ class ListUsersInteractorTest {
     @Test
     @DisplayName("Should propagate infrastructure exceptions through the reactive pipeline")
     void shouldPropagateRepositoryError() {
-        // Given: A critical persistence failure
-        var query = new ListUsersQuery(tenantId, null, 0, 10);
-        when(userRepository.findAllByTenantId(eq(tenantId), any(Pageable.class)))
+        // Given
+        var query = new ListUsersQuery(tenantId, null, null, 0, 10);
+
+        when(userRepository.findByTenantId(eq(tenantId), any(Pageable.class)))
                 .thenReturn(Flux.error(new RuntimeException("MongoDB Cursor Exhausted")));
 
         // When

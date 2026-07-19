@@ -16,12 +16,6 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Infrastructure Test: Validates the high-fidelity mapping of the {@link UserMapper}.
- * This suite ensures that the Anti-Corruption Layer (ACL) correctly translates
- * data between the Pure Domain, MongoDB Persistence Entities, and public Web DTOs,
- * preserving state integrity and security boundaries.
- */
 @DisplayName("Infrastructure: User Mapper (ACL)")
 class UserMapperTest {
 
@@ -43,19 +37,17 @@ class UserMapperTest {
     @Test
     @DisplayName("Should accurately project Domain Model to Persistence Entity")
     void shouldMapDomainToEntity() {
-        // Given
         User domain = User.provision(tenantId, null, "john.doe", UserLevel.OPERATOR, profile, "admin-01");
 
-        // When
         UserEntity entity = mapper.toEntity(domain);
 
-        // Then
         assertAll("Entity Mapping Verification",
                 () -> assertEquals(domain.id(), entity.id()),
                 () -> assertEquals(domain.tenantId(), entity.tenantId()),
                 () -> assertEquals(domain.username(), entity.username()),
                 () -> assertEquals(domain.status(), entity.status()),
-                () -> assertEquals(domain.profile().corporateEmail(), entity.corporateEmail()),
+                // Correção: acessando o campo direto no record
+                () -> assertEquals(domain.profile().corporateEmail(), entity.email()),
                 () -> assertEquals(domain.version(), entity.version())
         );
     }
@@ -63,22 +55,34 @@ class UserMapperTest {
     @Test
     @DisplayName("Should restore Domain Model from Persistence Entity with high fidelity")
     void shouldMapEntityToDomain() {
-        // Given
         UUID userId = UUID.randomUUID();
+
         UserEntity entity = new UserEntity(
-                userId, tenantId, null, "john.doe", "john.doe@thinklab.com",
-                UserStatus.ACTIVE, UserLevel.OPERATOR, profile, List.of("ROLE_USER"),
-                0, true, "system", Instant.now(), "system", Instant.now(), 1L
+                userId,
+                tenantId,
+                null,
+                "john.doe",
+                "john.doe@thinklab.com",
+                UserStatus.ACTIVE,
+                UserLevel.OPERATOR,
+                profile,
+                List.of("ROLE_USER"),
+                0,
+                true,
+                "system",
+                Instant.now(),
+                "system",
+                Instant.now(),
+                1L
         );
 
-        // When
         User domain = mapper.toDomain(entity);
 
-        // Then
         assertAll("Domain Restoration Verification",
                 () -> assertEquals(entity.id(), domain.id()),
                 () -> assertEquals(entity.tenantId(), domain.tenantId()),
                 () -> assertEquals(entity.status(), domain.status()),
+                // Correção: acessando o profile diretamente no record
                 () -> assertEquals(entity.profile().fullName(), domain.profile().fullName()),
                 () -> assertEquals(entity.version(), domain.version())
         );
@@ -87,13 +91,10 @@ class UserMapperTest {
     @Test
     @DisplayName("Should project Domain Model to sanitized Public Response DTO")
     void shouldMapDomainToResponse() {
-        // Given
         User domain = User.provision(tenantId, null, "john.doe", UserLevel.OPERATOR, profile, "admin-01");
 
-        // When
         UserResponse response = mapper.toResponse(domain);
 
-        // Then
         assertAll("Response Projection Verification",
                 () -> assertEquals(domain.id(), response.id()),
                 () -> assertEquals(domain.username(), response.username()),

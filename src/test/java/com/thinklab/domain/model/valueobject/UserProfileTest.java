@@ -8,8 +8,6 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Domain Unit Test: Validates the biographical integrity and sanitization
  * logic of the {@link UserProfile} value object.
- * This suite ensures that identity metadata is consistent, normalized,
- * and adheres to strict business invariants before entering the domain core.
  */
 @DisplayName("Domain: UserProfile Value Object")
 class UserProfileTest {
@@ -41,6 +39,7 @@ class UserProfileTest {
 
         // Then
         assertNull(profile.phoneNumber());
+        // Ajuste estes assertEquals conforme a implementação do seu construtor/factory
         assertEquals("en", profile.preferredLanguage(), "Should fallback to English");
         assertEquals("UTC", profile.timezone(), "Should fallback to UTC");
     }

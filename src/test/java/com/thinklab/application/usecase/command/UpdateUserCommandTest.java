@@ -11,15 +11,10 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Command Unit Test: Validates the boundary defense and input integrity
  * of the {@link UpdateUserCommand}.
- *
- * <p>Following the NASA-level engineering blueprint, this suite ensures
- * that biographical mutation intents are sanitized and strictly validated
- * before reaching the reactive orchestration layer.</p>
  */
 @DisplayName("Application: UpdateUser Command")
 class UpdateUserCommandTest {
 
-    private final UUID tenantId = UUID.randomUUID();
     private final UUID userId = UUID.randomUUID();
     private final UserProfile profile = new UserProfile(
             "John Doe",
@@ -36,11 +31,10 @@ class UpdateUserCommandTest {
         String rawExecutor = "  admin-agent-01  ";
 
         // When
-        var command = new UpdateUserCommand(tenantId, userId, profile, rawExecutor);
+        var command = new UpdateUserCommand(userId, profile, rawExecutor);
 
         // Then
         assertAll("Command Integrity",
-                () -> assertEquals(tenantId, command.tenantId()),
                 () -> assertEquals(userId, command.userId()),
                 () -> assertEquals(profile, command.profile()),
                 () -> assertEquals("admin-agent-01", command.executor(), "Executor ID should be trimmed")
@@ -52,13 +46,11 @@ class UpdateUserCommandTest {
     void shouldFailOnNullMandatoryFields() {
         assertAll(
                 () -> assertThrows(NullPointerException.class, () ->
-                        new UpdateUserCommand(null, userId, profile, "admin"), "tenantId is mandatory"),
+                        new UpdateUserCommand(null, profile, "admin"), "userId is mandatory"),
                 () -> assertThrows(NullPointerException.class, () ->
-                        new UpdateUserCommand(tenantId, null, profile, "admin"), "userId is mandatory"),
+                        new UpdateUserCommand(userId, null, "admin"), "profile metadata is mandatory"),
                 () -> assertThrows(NullPointerException.class, () ->
-                        new UpdateUserCommand(tenantId, userId, null, "admin"), "profile metadata is mandatory"),
-                () -> assertThrows(NullPointerException.class, () ->
-                        new UpdateUserCommand(tenantId, userId, profile, null), "executor identification is mandatory")
+                        new UpdateUserCommand(userId, profile, null), "executor identification is mandatory")
         );
     }
 
@@ -66,7 +58,7 @@ class UpdateUserCommandTest {
     @DisplayName("Should fail fast if executor identification is blank after trimming")
     void shouldFailOnBlankExecutor() {
         assertThrows(IllegalArgumentException.class, () ->
-                        new UpdateUserCommand(tenantId, userId, profile, "   "),
+                        new UpdateUserCommand(userId, profile, "   "),
                 "Command must reject empty executor strings to preserve audit quality.");
     }
 }

@@ -7,7 +7,6 @@ import com.thinklab.domain.valueobject.UserStatus;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -15,8 +14,6 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Domain Unit Test: Validates the core business invariants and state machine
  * of the {@link User} aggregate root.
- * These tests ensure that the identity lifecycle is consistent, immutable,
- * and resilient to invalid business operations.
  */
 @DisplayName("Domain: User Aggregate Root")
 class UserTest {
@@ -31,14 +28,14 @@ class UserTest {
     );
 
     @Test
-    @DisplayName("Should initialize user in PENDING status via factory")
+    @DisplayName("Should initialize user in PENDING_ACTIVATION status via factory")
     void shouldInitializeUserInPendingStatus() {
         // Given & When
         var user = User.provision(tenantId, null, "john.doe", UserLevel.OPERATOR, profile, "admin-01");
 
         // Then
         assertNotNull(user.id());
-        assertEquals(UserStatus.PENDING, user.status());
+        assertEquals(UserStatus.PENDING_ACTIVATION, user.status());
         assertEquals(0, user.failedAttempts());
         assertFalse(user.mfaEnabled());
         assertEquals(1, user.roles().size());
@@ -56,21 +53,21 @@ class UserTest {
 
         // Then
         assertNotSame(user, activatedUser);
-        assertEquals(UserStatus.PENDING, user.status());
+        assertEquals(UserStatus.PENDING_ACTIVATION, user.status());
         assertEquals(UserStatus.ACTIVE, activatedUser.status());
     }
 
     @Test
-    @DisplayName("Should throw exception on illegal state transition (ARCHIVED -> ACTIVE)")
+    @DisplayName("Should throw exception on illegal state transition (REVOKED -> ACTIVE)")
     void shouldThrowExceptionOnIllegalTransition() {
         // Given
         var user = User.provision(tenantId, null, "john.doe", UserLevel.OPERATOR, profile, "admin-01")
                 .activate("admin-01")
-                .archive("admin-01");
+                .revoke("admin-01");
 
         // When & Then
         assertThrows(InvalidUserStateTransitionException.class, () -> user.activate("admin-01"),
-                "Should not allow reactivation of an archived identity");
+                "Should not allow reactivation of a revoked identity");
     }
 
     @Test
@@ -94,12 +91,12 @@ class UserTest {
         var user = User.provision(tenantId, null, "john.doe", UserLevel.OPERATOR, profile, "admin-01")
                 .activate("admin-01");
 
-        // When
-        var state1 = user.recordFailedLogin();
-        var state2 = state1.recordFailedLogin();
-        var state3 = state2.recordFailedLogin();
-        var state4 = state3.recordFailedLogin();
-        var finalState = state4.recordFailedLogin();
+        // When: Passando 1 como argumento para o método
+        var state1 = user.recordFailedLogin(1);
+        var state2 = state1.recordFailedLogin(1);
+        var state3 = state2.recordFailedLogin(1);
+        var state4 = state3.recordFailedLogin(1);
+        var finalState = state4.recordFailedLogin(1);
 
         // Then
         assertEquals(5, finalState.failedAttempts());

@@ -43,6 +43,17 @@ public class UserRepositoryAdapter implements UserRepositoryPort {
     }
 
     @Override
+    public Mono<User> findByIdAndTenantId(UUID id, UUID tenantId) {
+        return repository.findByIdAndTenantId(id, tenantId)
+                .map(mapper::toDomain);
+    }
+
+    @Override
+    public Mono<Boolean> existsByTenantIdAndUsername(UUID tenantId, String username) {
+        return repository.existsByTenantIdAndUsername(tenantId, username);
+    }
+
+    @Override
     public Mono<Boolean> existsByTenantIdAndEmail(UUID tenantId, String email) {
         return repository.existsByTenantIdAndEmail(tenantId, email);
     }

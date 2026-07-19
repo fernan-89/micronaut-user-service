@@ -15,19 +15,24 @@ import java.util.UUID;
  * Infrastructure Repository: Reactive persistence interface for {@link UserEntity}.
  * This interface leverages Micronaut Data's AOT compilation to generate high-performance,
  * non-blocking MongoDB driver calls.
- *
- * <p><b>Architectural Constraints:</b></p>
- * <ul>
- *     <li><b>BSON Binary UUIDs:</b> Uses native UUIDs for optimized indexing.</li>
- *     <li><b>Zero Reflection:</b> Implementation generated at compile-time for GraalVM support.</li>
- *     <li><b>Multi-tenant Partitioning:</b> All queries are strictly scoped by tenantId.</li>
- * </ul>
  */
 @MongoRepository
 public interface MongoUserRepository extends ReactorPageableRepository<UserEntity, UUID> {
 
     /**
-     * Verifies identity uniqueness within a tenant boundary.
+     * Retrieves a user by ID and TenantID to ensure multi-tenant isolation.
+     */
+    @Nonnull
+    Mono<UserEntity> findByIdAndTenantId(@Nonnull UUID id, @Nonnull UUID tenantId);
+
+    /**
+     * Verifies identity uniqueness (Username) within a tenant boundary.
+     */
+    @Nonnull
+    Mono<Boolean> existsByTenantIdAndUsername(@Nonnull UUID tenantId, @Nonnull String username);
+
+    /**
+     * Verifies identity uniqueness (Email) within a tenant boundary.
      * Uses composite index on (tenantId, email) for O(log n) lookup.
      */
     @Nonnull

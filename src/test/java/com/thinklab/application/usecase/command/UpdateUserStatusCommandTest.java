@@ -11,16 +11,10 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Command Unit Test: Validates the boundary defense and input integrity
  * of the {@link UpdateUserStatusCommand}.
- *
- * <p>Following the NASA-level engineering blueprint, this suite ensures that
- * lifecycle state transitions are strictly validated at the system boundary,
- * requiring mandatory forensic justification and high-fidelity identification
- * of the authorizing agent.</p>
  */
 @DisplayName("Application: UpdateUserStatus Command")
 class UpdateUserStatusCommandTest {
 
-    private final UUID tenantId = UUID.randomUUID();
     private final UUID userId = UUID.randomUUID();
     private final UserStatus targetStatus = UserStatus.SUSPENDED;
 
@@ -31,12 +25,11 @@ class UpdateUserStatusCommandTest {
         String rawExecutor = "  compliance-officer-01  ";
         String rawReason = "  Suspension due to suspected credential compromise.  ";
 
-        // When
-        var command = new UpdateUserStatusCommand(tenantId, userId, targetStatus, rawExecutor, rawReason);
+        // When: Ordem correta (userId, status, executor, reason)
+        var command = new UpdateUserStatusCommand(userId, targetStatus, rawExecutor, rawReason);
 
         // Then
         assertAll("Command Integrity",
-                () -> assertEquals(tenantId, command.tenantId()),
                 () -> assertEquals(userId, command.userId()),
                 () -> assertEquals(targetStatus, command.status()),
                 () -> assertEquals("compliance-officer-01", command.executor(), "Executor ID should be trimmed"),
@@ -49,15 +42,13 @@ class UpdateUserStatusCommandTest {
     void shouldFailOnNullMandatoryFields() {
         assertAll(
                 () -> assertThrows(NullPointerException.class, () ->
-                        new UpdateUserStatusCommand(null, userId, targetStatus, "admin", "reason"), "tenantId is mandatory"),
+                        new UpdateUserStatusCommand(null, targetStatus, "admin", "reason"), "userId is mandatory"),
                 () -> assertThrows(NullPointerException.class, () ->
-                        new UpdateUserStatusCommand(tenantId, null, targetStatus, "admin", "reason"), "userId is mandatory"),
+                        new UpdateUserStatusCommand(userId, null, "admin", "reason"), "target status is mandatory"),
                 () -> assertThrows(NullPointerException.class, () ->
-                        new UpdateUserStatusCommand(tenantId, userId, null, "admin", "reason"), "target status is mandatory"),
+                        new UpdateUserStatusCommand(userId, targetStatus, null, "reason"), "executor is mandatory"),
                 () -> assertThrows(NullPointerException.class, () ->
-                        new UpdateUserStatusCommand(tenantId, userId, targetStatus, null, "reason"), "executor is mandatory"),
-                () -> assertThrows(NullPointerException.class, () ->
-                        new UpdateUserStatusCommand(tenantId, userId, targetStatus, "admin", null), "reason is mandatory")
+                        new UpdateUserStatusCommand(userId, targetStatus, "admin", null), "reason is mandatory")
         );
     }
 
@@ -66,10 +57,10 @@ class UpdateUserStatusCommandTest {
     void shouldFailOnBlankFields() {
         assertAll(
                 () -> assertThrows(IllegalArgumentException.class, () ->
-                                new UpdateUserStatusCommand(tenantId, userId, targetStatus, "   ", "valid reason"),
+                                new UpdateUserStatusCommand(userId, targetStatus, "   ", "valid reason"),
                         "Command must reject empty executor strings"),
                 () -> assertThrows(IllegalArgumentException.class, () ->
-                                new UpdateUserStatusCommand(tenantId, userId, targetStatus, "admin", "   "),
+                                new UpdateUserStatusCommand(userId, targetStatus, "admin", "   "),
                         "Command must reject empty justification for lifecycle changes")
         );
     }
@@ -77,7 +68,7 @@ class UpdateUserStatusCommandTest {
     @Test
     @DisplayName("Should maintain state immutability through reactive pipeline")
     void shouldBeImmutable() {
-        var command = new UpdateUserStatusCommand(tenantId, userId, targetStatus, "admin", "reason");
+        var command = new UpdateUserStatusCommand(userId, targetStatus, "admin", "reason");
         // Records are inherently immutable and final.
         assertTrue(command.getClass().isRecord());
     }

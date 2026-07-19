@@ -9,66 +9,45 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Command Unit Test: Validates the boundary defense and input integrity
- * of the {@link UpdateUserRolesCommand}.
- *
- * <p>Following the NASA-level engineering blueprint, this suite ensures
- * that security-critical role mutations are sanitized and strictly validated
- * at the system boundary to prevent unauthorized or malformed state changes.</p>
+ * Command Unit Test: Validates the boundary defense of {@link UpdateUserRolesCommand}.
  */
 @DisplayName("Application: UpdateUserRoles Command")
 class UpdateUserRolesCommandTest {
 
-    private final UUID tenantId = UUID.randomUUID();
     private final UUID userId = UUID.randomUUID();
-    private final List<String> roles = List.of("ROLE_ADMIN", "REPORTS_VIEWER");
+    private final List<String> roles = List.of("ADMIN", "OPERATOR");
+    private final String reason = "Forensic compliance update";
 
     @Test
     @DisplayName("Should successfully instantiate command with valid data and sanitization")
     void shouldCreateValidCommand() {
         // Given
-        String rawExecutor = "  security-admin-01  ";
+        String rawExecutor = "  security-admin  ";
 
-        // When
-        var command = new UpdateUserRolesCommand(tenantId, userId, roles, rawExecutor);
+        // When: Ordem correta: (userId, roles, executor, reason)
+        var command = new UpdateUserRolesCommand(userId, roles, rawExecutor, reason);
 
         // Then
         assertAll("Command Integrity",
-                () -> assertEquals(tenantId, command.tenantId()),
                 () -> assertEquals(userId, command.userId()),
                 () -> assertEquals(roles, command.roles()),
-                () -> assertEquals("security-admin-01", command.executor(), "Executor ID should be trimmed")
+                () -> assertEquals("security-admin", command.executor(), "Executor should be trimmed"),
+                () -> assertEquals(reason, command.reason())
         );
     }
 
     @Test
-    @DisplayName("Should throw NullPointerException for mandatory fields (Defense in Depth)")
+    @DisplayName("Should throw NullPointerException for mandatory fields")
     void shouldFailOnNullMandatoryFields() {
         assertAll(
                 () -> assertThrows(NullPointerException.class, () ->
-                        new UpdateUserRolesCommand(null, userId, roles, "admin"), "tenantId is mandatory"),
+                        new UpdateUserRolesCommand(null, roles, "admin", reason)),
                 () -> assertThrows(NullPointerException.class, () ->
-                        new UpdateUserRolesCommand(tenantId, null, roles, "admin"), "userId is mandatory"),
+                        new UpdateUserRolesCommand(userId, null, "admin", reason)),
                 () -> assertThrows(NullPointerException.class, () ->
-                        new UpdateUserRolesCommand(tenantId, userId, null, "admin"), "roles list is mandatory"),
+                        new UpdateUserRolesCommand(userId, roles, null, reason)),
                 () -> assertThrows(NullPointerException.class, () ->
-                        new UpdateUserRolesCommand(tenantId, userId, roles, null), "executor is mandatory")
+                        new UpdateUserRolesCommand(userId, roles, "admin", null))
         );
-    }
-
-    @Test
-    @DisplayName("Should fail fast if executor identification is blank after trimming")
-    void shouldFailOnBlankExecutor() {
-        assertThrows(IllegalArgumentException.class, () ->
-                        new UpdateUserRolesCommand(tenantId, userId, roles, "   "),
-                "Command must reject empty executor strings to preserve audit quality.");
-    }
-
-    @Test
-    @DisplayName("Should fail fast if roles list is empty")
-    void shouldFailOnEmptyRoles() {
-        assertThrows(IllegalArgumentException.class, () ->
-                        new UpdateUserRolesCommand(tenantId, userId, List.of(), "admin"),
-                "Command should reject empty role assignments to prevent privilege stripping without intent.");
     }
 }

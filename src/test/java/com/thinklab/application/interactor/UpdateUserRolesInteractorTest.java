@@ -26,10 +26,6 @@ import static org.mockito.Mockito.*;
 /**
  * Application Unit Test: Validates the security-critical orchestration logic of the
  * {@link UpdateUserRolesInteractor}.
- *
- * <p>This suite ensures that functional role mutations are executed under strict
- * transactional boundaries, requiring identity verification and mandatory
- * forensic auditing to satisfy Tier 3 Enterprise Maturity requirements.</p>
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Application: UpdateUserRoles Interactor")
@@ -46,7 +42,14 @@ class UpdateUserRolesInteractorTest {
     private final UUID tenantId = UUID.randomUUID();
     private final UUID userId = UUID.randomUUID();
     private final List<String> newRoles = List.of("ROLE_ADMIN", "REPORTS_MANAGER");
-    private final UpdateUserRolesCommand command = new UpdateUserRolesCommand(tenantId, userId, newRoles, "security-admin");
+
+    // Instanciação correta seguindo a assinatura: (userId, roles, executor, reason)
+    private final UpdateUserRolesCommand command = new UpdateUserRolesCommand(
+            userId,
+            newRoles,
+            "security-admin",
+            "Forensic upgrade due to department change"
+    );
 
     @BeforeEach
     void setUp() {

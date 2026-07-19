@@ -10,16 +10,14 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Domain Unit Test: Validates the Finite State Machine (FSM) logic of the {@link UserStatus} enum.
- * This suite ensures that identity lifecycles are consistent and that illegal
- * state transitions are strictly prohibited at the type level.
  */
 @DisplayName("Domain: UserStatus State Machine")
 class UserStatusTest {
 
     @Test
-    @DisplayName("Should allow transition from PENDING to ACTIVE")
+    @DisplayName("Should allow transition from PENDING_ACTIVATION to ACTIVE")
     void shouldAllowPendingToActive() {
-        assertDoesNotThrow(() -> UserStatus.PENDING.validateTransitionTo(UserStatus.ACTIVE));
+        assertDoesNotThrow(() -> UserStatus.PENDING_ACTIVATION.validateTransitionTo(UserStatus.ACTIVE));
     }
 
     @Test
@@ -35,39 +33,36 @@ class UserStatusTest {
     }
 
     @Test
-    @DisplayName("Should throw exception when transitioning from ARCHIVED to ACTIVE (Terminal State)")
-    void shouldDenyActiveAfterArchived() {
+    @DisplayName("Should throw exception when transitioning from REVOKED to ACTIVE (Terminal State)")
+    void shouldDenyActiveAfterRevoked() {
         assertThrows(InvalidUserStateTransitionException.class,
-                () -> UserStatus.ARCHIVED.validateTransitionTo(UserStatus.ACTIVE),
-                "Archived state must be terminal and deny any further transitions.");
+                () -> UserStatus.REVOKED.validateTransitionTo(UserStatus.ACTIVE),
+                "Revoked state must be terminal and deny any further transitions.");
     }
 
     @Test
     @DisplayName("Should throw exception when transitioning from BLOCKED to ACTIVE without proper flow")
     void shouldDenyDirectActivationFromBlocked() {
-        // Assuming blocked must go back through specific administrative flow or stay blocked
+        // Nota: Se o seu Enum permitir BLOCKED -> ACTIVE, este teste falhará propositalmente.
+        // Se a regra de negócio for bloquear a transição, ajuste a constante VALID_TRANSITIONS no Enum.
         assertThrows(InvalidUserStateTransitionException.class,
                 () -> UserStatus.BLOCKED.validateTransitionTo(UserStatus.ACTIVE));
     }
 
     @ParameterizedTest
-    @EnumSource(value = UserStatus.class, names = {"ACTIVE", "PENDING"})
+    @EnumSource(value = UserStatus.class, names = {"ACTIVE", "PENDING_ACTIVATION"})
     @DisplayName("Should allow login for operational states")
     void shouldAllowLoginForOperationalStates(UserStatus status) {
-        // Logic depends on your UserStatus implementation (e.g. status.isLoginAllowed())
-        assertTrue(status.name().equals("ACTIVE") || status.name().equals("PENDING"),
-                "Operational states should potentially allow access during onboarding or post-activation.");
+        assertTrue(status.isLoginAllowed(),
+                "Operational states should allow system access.");
     }
 
     @ParameterizedTest
-    @EnumSource(value = UserStatus.class, names = {"SUSPENDED", "BLOCKED", "ARCHIVED"})
+    @EnumSource(value = UserStatus.class, names = {"SUSPENDED", "BLOCKED", "REVOKED"})
     @DisplayName("Should deny login for restricted states")
     void shouldDenyLoginForRestrictedStates(UserStatus status) {
-        // Logic checking the business rule encapsulated in the enum
-        if (status == UserStatus.BLOCKED || status == UserStatus.ARCHIVED) {
-            // This is a conceptual check based on the 'loginAllowed' pattern from sources
-            assertFalse(false, "Restricted states must invariably deny system access.");
-        }
+        assertFalse(status.isLoginAllowed(),
+                "Restricted states must invariably deny system access.");
     }
 
     @Test
